@@ -88,17 +88,20 @@ def main():
 
             if response.get("error"):
                 st.error(response["error"])
-            return
+                return  # ← el return debe estar dentro del if
 
-            games = response.get("recommendations", [])
             # Renderizado de tarjetas en 5 columnas
+            games = response.get("recommendations", [])
             cols = st.columns(5)
             for i, game in enumerate(games):
                 with cols[i]:
-                    st.image(game["img"], use_container_width=True)
-                    st.markdown(f"**{game['title']}**")
+                    st.markdown(f"**{game['name']}**")
                     st.caption(f"Genre: {game['genre']}")
-                    # Aquí ya no están los st.progress ni los textos de match
+                    st.caption(f"{game['popular_tags']}")
+                    st.caption(f"💰 {game['original_price']}")
+                    st.caption(f"⭐ {game['review_percentage']}")
+                    st.write(f"🔗 [Link]({game['url']})")
+
         else:
             st.error("Please describe your ideal game first!")
 
