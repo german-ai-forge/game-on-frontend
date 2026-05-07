@@ -96,6 +96,7 @@ def main():
             for i, game in enumerate(games):
                 with cols[i]:
                     st.markdown(f"**{game['name']}**")
+                    st.caption(f"📊 Match: {game['match']:.2%}")
                     st.caption(f"Genre: {game['genre']}")
                     st.caption(f"{game['popular_tags']}")
                     st.caption(f"💰 {game['original_price']}")
