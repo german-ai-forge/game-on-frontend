@@ -1,5 +1,3 @@
-from urllib import response
-
 import streamlit as st
 from services.query_api import get_recommendations
 
@@ -64,13 +62,8 @@ def main():
         )
 
         # Filtros técnicos debajo del prompt
-        f1, f2, f3 = st.columns(3)
-        with f1:
-            precio = st.slider("Max Price ($)", 0, 100, 25)
-        with f2:
-            modo = st.selectbox("Mode", ["Any", "Single-player", "Online Co-op", "Multiplayer"])
-        with f3:
-            mando = st.selectbox("Controller", ["Any", "Full Support", "Partial"])
+        precio = st.slider("Max Price ($)", 0, 100, 25)
+
 
         st.write("")
         search_clicked = st.button("Search Recommendations")
@@ -92,15 +85,28 @@ def main():
 
             # Renderizado de tarjetas en 5 columnas
             games = response.get("recommendations", [])
+
+            games = [
+               game for game in games
+               if game.get("original_price", 0.0) <= precio
+            ]
+
+            st.write(f"Games after price filter: {len(games)}")
+
+            if not games:
+                st.warning("No recommendations found with the selected price filter.")
+                return
+
             cols = st.columns(5)
-            for i, game in enumerate(games):
+
+            for i, game in enumerate(games[:5]):
                 with cols[i]:
                     st.markdown(f"**{game['name']}**")
                     st.caption(f"📊 Match: {game['match']:.2%}")
                     st.caption(f"Genre: {game['genre']}")
                     st.caption(f"{game['popular_tags']}")
                     st.caption(f"💰 {game['original_price']}")
-                    st.caption(f"⭐ {game['review_percentage']}")
+                    st.caption(f"⭐ {game['review_percentage']})")
                     st.write(f"🔗 [Link]({game['url']})")
 
         else:

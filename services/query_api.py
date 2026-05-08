@@ -30,7 +30,20 @@ def get_recommendations(query: str) -> dict:
         )
 
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+
+            logger.info("Backend response JSON: %s", data)
+
+            logger.info("Prices received from backend:")
+
+            for game in data.get("recommendations", []):
+                logger.info(
+                    "Game: %s | price: %s",
+                    game.get("name"),
+                    game.get("original_price")
+                    )
+
+            return data
 
         elif response.status_code == 500:
             logger.error(
