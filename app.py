@@ -1,5 +1,6 @@
 import streamlit as st
 from services.query_api import get_recommendations
+import re
 
 def main():
     """
@@ -72,23 +73,30 @@ def main():
     if search_clicked:
         if st.session_state.user_input:
             st.write("---")
-            st.subheader(f"🎮 Recommendations based on: '{st.session_state.user_input}'")
 
-            # Llamada a la API para obtener recomendaciones
-            response = get_recommendations(
-                 st.session_state.user_input
-                )
+            response = get_recommendations(st.session_state.user_input)
 
             if response.get("error"):
                 st.error(response["error"])
-                return  # ← el return debe estar dentro del if
+                return
 
-            # Renderizado de tarjetas en 5 columnas
+            if response.get("consulta_mejorada"):
+                st.info(f"🔍 Búsqueda mejorada: {response['consulta_mejorada']}")
+
+            st.subheader(f"🎮 Recommendations based on: '{st.session_state.user_input}'")
+
             games = response.get("recommendations", [])
 
+            def parse_price(price):
+                cleaned = re.sub(r'[^\d.]', '', str(price))
+                parts = cleaned.split('.')
+                if len(parts) > 2:
+                    cleaned = parts[0] + '.' + ''.join(parts[1:])
+                return float(cleaned or 0)
+
             games = [
-               game for game in games
-               if game.get("original_price", 0.0) <= precio
+                game for game in games
+                if parse_price(game.get("original_price", 0)) <= precio
             ]
 
             st.write(f"Games after price filter: {len(games)}")
@@ -101,12 +109,26 @@ def main():
 
             for i, game in enumerate(games[:5]):
                 with cols[i]:
+
+                    if game.get('trailer'):
+                        st.markdown(f"""
+                            <video width="100%" controls>
+                                <source src="{game['trailer']}">
+                            </video>
+                        """, unsafe_allow_html=True)
                     st.markdown(f"**{game['name']}**")
                     st.caption(f"📊 Match: {game['match']:.2%}")
+                    if game.get('descripcion'):
+                        st.caption(game['descripcion'])
                     st.caption(f"Genre: {game['genre']}")
                     st.caption(f"{game['popular_tags']}")
-                    st.caption(f"💰 {game['original_price']}")
-                    st.caption(f"⭐ {game['review_percentage']})")
+                    if game.get('original_price') is None:
+                        st.caption("💰 Free to play")
+                    elif game.get('discount') and game['discount'] > 0:
+                        st.caption(f"💰 {game['original_price']} 🏷️ -{game['discount']}% descuento")
+                    else:
+                        st.caption(f"💰 {game['original_price']}")
+                    st.caption(f"⭐ {game['review_percentage']}")
                     st.write(f"🔗 [Link]({game['url']})")
 
         else:
