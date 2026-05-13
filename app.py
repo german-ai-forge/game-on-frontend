@@ -162,7 +162,11 @@ def main():
         if st.session_state.user_input:
             query = st.session_state.user_input.strip()
 
-            if len(query.split()) >= 3 and not is_english_query(query):
+            if len(query.split()) < 3:
+                st.warning("Please describe your ideal game in English using at least 3 words.")
+                return
+
+            if not is_english_query(query):
                 st.warning("Please enter your game description in English.")
                 return
 
