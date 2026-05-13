@@ -1,847 +1,275 @@
 import streamlit as st
 from services.query_api import get_recommendations
 import re
-
+from utils.language_utils import is_english_query
 
 def main():
+    """
+    Función principal de GAME ON.
+    Muestra una interfaz limpia con resultados de búsqueda, manteniendo el input
+    del usuario mediante session_state y eliminando métricas de match.
+    """
 
-    # ---------------------------------------------------
-    # PAGE CONFIG
-    # ---------------------------------------------------
-    st.set_page_config(
-        page_title="GAME ON",
-        page_icon="🎮",
-        layout="wide"
-    )
+    # 1. Configuración de la página
+    st.set_page_config(page_title="GAME ON", page_icon="🎮", layout="wide")
 
-    # ---------------------------------------------------
-    # SESSION STATE
-    # ---------------------------------------------------
-    if "search_done" not in st.session_state:
-        st.session_state.search_done = False
-
-    if "results" not in st.session_state:
-        st.session_state.results = None
-
-    if "user_input" not in st.session_state:
+    # Inicializamos el estado de la sesión para el prompt si no existe
+    if 'user_input' not in st.session_state:
         st.session_state.user_input = ""
 
-    if "last_input" not in st.session_state:
-        st.session_state.last_input = ""
-
-    if "active_trailer" not in st.session_state:
-        st.session_state.active_trailer = None
-
-    # ---------------------------------------------------
-    # RESET STATE
-    # ---------------------------------------------------
-    def reset_state_if_needed():
-
-        if st.session_state.user_input != st.session_state.last_input:
-
-            st.session_state.search_done = False
-            st.session_state.results = None
-            st.session_state.active_trailer = None
-
-    # ---------------------------------------------------
-    # CSS
-    # ---------------------------------------------------
+    # 2. Estilos Personalizados (CSS)
     st.markdown("""
-    <style>
-
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-
-    .stApp {
-        background-color: #0e1117;
-        color: white;
-    }
-
-    .block-container {
-        padding-top: 1.2rem;
-        padding-bottom: 1rem;
-        max-width: 1500px;
-    }
-
-    /* HEADER */
-
-    .header-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-
-        text-align: center;
-
-        padding-top: 25px;
-        padding-bottom: 15px;
-    }
-
-    .main-title {
-
-        font-family: 'Orbitron', sans-serif !important;
-
-        font-size: 110px !important;
-
-        font-weight: 900 !important;
-
-        margin: 0 !important;
-
-        background: linear-gradient(
-            180deg,
-            #ffffff 0%,
-            #4b6cb7 100%
-        );
-
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-
-        line-height: 1;
-
-        letter-spacing: 4px;
-
-        text-shadow:
-            0px 10px 20px rgba(75,108,183,0.3);
-    }
-
-    .main-subtitle {
-
-        color: #8b949e;
-
-        font-size: 22px;
-
-        margin-top: 10px;
-
-        font-family: 'Orbitron', sans-serif;
-    }
-
-    /* INPUT */
-
-    .stTextArea textarea {
-
-        background-color: #161b22 !important;
-
-        color: white !important;
-
-        border-radius: 16px !important;
-
-        border: 1px solid #30363d !important;
-
-        font-size: 18px !important;
-
-        padding: 14px !important;
-    }
-
-    .stTextArea textarea::placeholder {
-        color: #8b949e !important;
-    }
-
-    /* BUTTON */
-
-    .stButton > button {
-
-        width: 100%;
-
-        border-radius: 12px !important;
-
-        border: none !important;
-
-        background: linear-gradient(
-            90deg,
-            #4b6cb7 0%,
-            #182848 100%
-        ) !important;
-
-        color: white !important;
-
-        font-weight: 700 !important;
-
-        height: 48px !important;
-
-        transition: 0.25s;
-    }
-
-    .stButton > button:hover {
-
-        border: 1px solid #4b6cb7 !important;
-
-        box-shadow:
-            0px 0px 18px rgba(75,108,183,0.35);
-    }
-
-    /* GAME CARD */
-
-    .game-card {
-
-        background-color: #161b22;
-
-        border: 1px solid #30363d;
-
-        border-radius: 18px;
-
-        padding: 18px;
-
-        margin-bottom: 18px;
-
-        transition: 0.2s;
-    }
-
-    .game-card:hover {
-
-        border: 1px solid #4b6cb7;
-
-        box-shadow:
-            0px 0px 18px rgba(75,108,183,0.18);
-    }
-
-    /* IMAGES */
-
-    img {
-        border-radius: 14px !important;
-    }
-
-    video {
-        width: 100%;
-        border-radius: 14px;
-        border: 1px solid #30363d;
-    }
-
-    /* TEXT COMPACT */
-
-    .compact-text {
-        line-height: 1.15 !important;
-    }
-
-    /* LINK BUTTON */
-
-    [data-testid="stLinkButton"] a {
-
-        background: linear-gradient(
-            90deg,
-            #1f6feb 0%,
-            #388bfd 100%
-        ) !important;
-
-        color: white !important;
-
-        border-radius: 12px !important;
-
-        border: none !important;
-
-        font-weight: 700 !important;
-
-        height: 46px !important;
-
-        display: flex !important;
-
-        align-items: center !important;
-
-        justify-content: center !important;
-
-        text-decoration: none !important;
-
-        transition: 0.25s !important;
-    }
-
-    [data-testid="stLinkButton"] a:hover {
-
-        border: 1px solid #4b6cb7 !important;
-
-        box-shadow:
-            0px 0px 18px rgba(75,108,183,0.35);
-    }
-
-    </style>
-    """, unsafe_allow_html=True)
-
-    # ---------------------------------------------------
-    # HEADER
-    # ---------------------------------------------------
-    st.markdown(
-        """
+        <style>
+        /* Importamos la tipografía Gamer */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        .stApp { background-color: #0e1117; color: white; }
+
+        .header-container {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; text-align: center; padding: 50px 0 30px 0;
+        }
+
+        .main-title {
+            font-family: 'Orbitron', sans-serif !important;
+            font-size: 110px !important;
+            font-weight: 900 !important;
+            margin: 0 !important;
+            background: -webkit-linear-gradient(#ffffff, #4b6cb7) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            line-height: 1.1 !important;
+            text-shadow: 0px 10px 20px rgba(75, 108, 183, 0.3) !important;
+            letter-spacing: 5px !important;
+            white-space: nowrap !important;
+        }
+
+        .main-subtitle {
+            font-family: 'Orbitron', sans-serif !important;
+            color: #8b949e !important;
+            font-size: 28px !important;
+            font-weight: 400 !important;
+            letter-spacing: 2px !important;
+            margin-top: 10px !important;
+        }
+
+        /* Inputs y Botón (igual que antes) */
+        .stTextArea textarea {
+            background-color: #161b22 !important; color: #ffffff !important;
+            border: 1px solid #30363d !important; border-radius: 15px !important;
+            font-size: 18px !important; font-weight: 500 !important;
+        }
+        .stTextArea textarea::placeholder { color: #e6edf3 !important; opacity: 0.8 !important; }
+
+        div[data-testid="stWidgetLabel"] p, .stSlider label p {
+            color: #ffffff !important; font-size: 16px !important; font-weight: 600 !important;
+        }
+
+        .stButton>button {
+            background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%) !important;
+            color: white !important; border-radius: 10px !important;
+            font-weight: bold !important; height: 50px; border: none !important;
+            transition: 0.3s;
+        }
+        .stButton>button:hover { border: 1px solid #ffffff !important; box-shadow: 0px 0px 15px rgba(75, 108, 183, 0.4); }
+
+        /* --- MODIFICACIÓN: Estilos para la Lista Escalonada de Juegos --- */
+
+        /* Contenedor de cada juego en la lista */
+        .game-list-item {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px; /* Espacio entre juegos */
+            transition: 0.3s;
+            display: flex; /* Para asegurar alineación interna si hace falta */
+            align-items: flex-start;
+        }
+
+        /* Efecto al pasar el mouse por encima de la tarjeta del juego */
+        .game-list-item:hover {
+            border: 1px solid #4b6cb7;
+            box-shadow: 0px 0px 20px rgba(75, 108, 183, 0.2);
+            transform: translateY(-2px); /* Pequeño levante */
+        }
+
+        /* Título del juego dentro de la lista */
+        .game-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px !important;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: #ffffff;
+        }
+
+        /* Video responsivo y redondeado */
+        .stVideo video, .game-video video {
+            border-radius: 15px !important;
+            border: 1px solid #30363d;
+        }
+
+        /* Estilos para etiquetas de metadatos */
+        .game-meta {
+            color: #8b949e;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .game-about {
+            font-size: 16px;
+            color: #e6edf3;
+            line-height: 1.6;
+            margin: 15px 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+    # 3. Encabezado centrado
+    st.markdown("""
         <div class="header-container">
-            <div class="main-title">GAME ON</div>
-            <div class="main-subtitle">
-                Find your next favorite game
-            </div>
+            <h1 class="main-title">GAME ON</h1>
+            <p style="color: #8b949e; font-size: 22px;">Find your next favorite game</p>
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+        """, unsafe_allow_html=True)
 
-    # ---------------------------------------------------
-    # SEARCH SECTION
-    # ---------------------------------------------------
+    # 4. Sección de Buscador y Filtros
     col1, col2, col3 = st.columns([1, 2, 1])
-
     with col2:
-
-        st.text_area(
+        # Input vinculado a session_state para persistencia
+        user_description = st.text_area(
             label="",
             placeholder="Try: 'A relaxing adventure with a deep story and puzzles'...",
             height=120,
             key="user_input"
         )
 
-        reset_state_if_needed()
-
-        st.session_state.last_input = st.session_state.user_input
-
-        precio = st.slider(
-            "Max Price ($)",
-            0,
-            100,
-            25
-        )
+        # Filtros técnicos debajo del prompt
+        precio = st.slider("Max Price ($)", 0, 100, 25)
 
         st.write("")
 
-        sub1, sub2, sub3 = st.columns([1, 2, 1])
-
-        with sub2:
-
-            if st.button(
-                "Search Recommendations",
-                use_container_width=True
-            ):
-
-                st.session_state.search_done = True
-                st.session_state.results = None
-
-    # ---------------------------------------------------
-    # RESULTS
-    # ---------------------------------------------------
-    if st.session_state.search_done and st.session_state.user_input:
-
-        if st.session_state.results is None:
-
-            st.session_state.results = get_recommendations(
-                st.session_state.user_input
-            )
-
-        response = st.session_state.results
-
-        if response.get("error"):
-
-            st.error(response["error"])
-            return
-
-        assistant_response = (
-            response.get("respuesta")
-            or response.get("message")
-        )
-
-        if assistant_response:
-
-            with st.chat_message("assistant"):
-                st.markdown(assistant_response)
-
-        if response.get("consulta_mejorada"):
-
-            st.info(
-                f"🔍 Improved query: "
-                f"{response['consulta_mejorada']}"
-            )
-
-        st.subheader(
-            f"🎮 Recommendations based on: "
-            f"'{st.session_state.user_input}'"
-        )
-
-        games = response.get("recommendations", [])
-
-        # ---------------------------------------------------
-        # PRICE PARSER
-        # ---------------------------------------------------
-        def parse_price(price):
-
-            if price is None:
-                return 0
-
-            cleaned = re.sub(
-                r"[^\d.]",
-                "",
-                str(price)
-            )
-
-            parts = cleaned.split(".")
-
-            if len(parts) > 2:
-                cleaned = (
-                    parts[0]
-                    + "."
-                    + "".join(parts[1:])
-                )
-
-            return float(cleaned or 0)
-
-        # ---------------------------------------------------
-        # FILTER
-        # ---------------------------------------------------
-        games = [
-            g for g in games
-            if parse_price(
-                g.get("original_price", 0)
-            ) <= precio
-        ]
-
-        if not games:
-
-            st.warning(
-                "No recommendations found."
-            )
-
-        else:
-
-            for i, game in enumerate(games[:8]):
-
-                game_id = game.get(
-                    "name",
-                    f"game_{i}"
-                )
-
-                best_match = i == 0
-
-                st.markdown(
-                    '<div class="game-card">',
-                    unsafe_allow_html=True
-                )
-
-                col_left, col_right = st.columns([2, 3])
-
-                # ---------------------------------------------------
-                # LEFT
-                # ---------------------------------------------------
-                with col_left:
-
-                    img_url = (
-                        game.get("image_url")
-                        or game.get("header_image")
-                    )
-
-                    if not img_url and game.get("app_id"):
-
-                        img_url = (
-                            "https://cdn.akamai.steamstatic.com/"
-                            f"steam/apps/{game['app_id']}/header.jpg"
-                        )
-
-                    if not img_url:
-
-                        img_url = (
-                            "https://via.placeholder.com/"
-                            "460x215?text=Preview+Not+Available"
-                        )
-
-                    trailer = game.get("trailer")
-
-                    # ACTIVE TRAILER
-                    if (
-                        st.session_state.active_trailer
-                        == game_id
-                        and trailer
-                    ):
-
-                        st.markdown(
-                            f"""
-                            <video autoplay controls>
-                                <source
-                                    src="{trailer}"
-                                    type="video/mp4">
-                            </video>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                    else:
-
-                        st.image(
-                            img_url,
-                            use_container_width=True
-                        )
-
-                    # BUTTONS
-                    btn1, btn2, btn3 = st.columns(3)
-
-                    with btn1:
-
-                        if trailer:
-
-                            if st.button(
-                                "🎬 Trailer",
-                                key=f"trailer_{game_id}"
-                            ):
-
-                                st.session_state.active_trailer = game_id
-                                st.rerun()
-
-                    with btn2:
-
-                        if st.button(
-                            "◧ Cover",
-                            key=f"poster_{game_id}"
-                        ):
-
-                            if (
-                                st.session_state.active_trailer
-                                == game_id
-                            ):
-
-                                st.session_state.active_trailer = None
-
-                            st.rerun()
-
-                    with btn3:
-
-                        steam_url = game.get("url", "#")
-
-                        st.link_button(
-                            "🎮 View on Steam",
-                            steam_url,
-                            use_container_width=True
-                        )
-
-
-
-                # ---------------------------------------------------
-                # RIGHT
-                # ---------------------------------------------------
-                with col_right:
-
-                    # ---------------------------------------------------
-                    # TITLE + BEST MATCH
-                    # ---------------------------------------------------
-                    title_cols = st.columns([5, 2])
-
-                    with title_cols[0]:
-                        st.markdown(
-                            f"""
-                            <div style="
-                                font-size:30px;
-                                font-weight:800;
-                                color:white;
-                                font-family:'Orbitron',sans-serif;
-                                line-height:1.1;
-                                margin-bottom:2px;
-                            ">
-                                {game['name']}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                    with title_cols[1]:
-
-                        if best_match:
-
-                            st.markdown(
-                                """
-                                <div style="
-                                    background:#facc15;
-                                    color:black;
-                                    font-size:11px;
-                                    font-weight:800;
-                                    padding:6px 10px;
-                                    border-radius:8px;
-                                    text-align:center;
-                                    margin-top:8px;
-                                ">
-                                    ⭐ BEST MATCH
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                    # ---------------------------------------------------
-                    # MATCH
-                    # ---------------------------------------------------
-                    st.markdown(
-                        f"""
-                        <div style="
-                            color:#58a6ff;
-                            font-size:14px;
-                            font-weight:700;
-                            margin-top:2px;
-                            margin-bottom:8px;
-                        ">
-                            🎯 {(game['match'] * 100):.1f}% MATCH
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-                    # ---------------------------------------------------
-                    # DESCRIPTION
-                    # ---------------------------------------------------
-                    if game.get("descripcion"):
-
-                        st.markdown(
-                            f"""
-                            <div style="
-                                font-size:14px;
-                                color:#d1d5db;
-                                line-height:1.2;
-                                margin-bottom:8px;
-                            ">
-                                {game['descripcion']}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                    # ---------------------------------------------------
-                    # GENRE
-                    # ---------------------------------------------------
-                    st.markdown(
-                        f"""
-                        <div style="
-                            color:#9ca3af;
-                            font-size:13px;
-                            line-height:1.1;
-                            margin-bottom:4px;
-                        ">
-                            <span style="
-                                color:white;
-                                font-weight:700;
-                            ">
-                                Genre:
-                            </span>
-                            {game.get('genre', 'Unknown')}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-                    # ---------------------------------------------------
-                    # TAGS
-                    # ---------------------------------------------------
-                    st.markdown(
-                        f"""
-                        <div style="
-                            color:#9ca3af;
-                            font-size:13px;
-                            line-height:1.1;
-                            margin-bottom:8px;
-                        ">
-                            <span style="
-                                color:white;
-                                font-weight:700;
-                            ">
-                                Popular tags:
-                            </span>
-                            {game.get('popular_tags', 'N/A')}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-                    # ---------------------------------------------------
-                    # PRICE
-                    # ---------------------------------------------------
-
-                    def normalize_price(price):
-
-                        if price is None:
-                            return None
-
-                        try:
-
-                            # extrae únicamente números
-                            cleaned = re.sub(
-                                r"[^\d.]",
-                                "",
-                                str(price)
-                            )
-
-                            parts = cleaned.split(".")
-
-                            if len(parts) > 2:
-                                cleaned = (
-                                    parts[0]
-                                    + "."
-                                    + "".join(parts[1:])
-                                )
-
-                            value = float(cleaned or 0)
-
-                            # ---------------------------------------------------
-                            # APROX USD NORMALIZATION
-                            # ---------------------------------------------------
-                            # Steam suele devolver MXN para LATAM
-                            # Conversión aproximada MXN -> USD
-                            # Ajusta si deseas otro rate
-                            # ---------------------------------------------------
-
-                            usd_value = value / 20
-
-                            return f"USD ${usd_value:.2f}"
-
-                        except:
-                            return str(price)
-
-
-                    # FREE
-                    if game.get("original_price") is None:
-
-                        st.markdown(
+        # --- EL TRUCO INFALIBLE: SUB-COLUMNAS ---
+        # Creamos 3 columnas pequeñas dentro de col2. La del medio es más ancha.
+        sub_col1, sub_col2, sub_col3 = st.columns([1, 2, 1])
+        with sub_col2:
+            # use_container_width=True hace que el botón llene su sub-columna, quedando centrado
+            search_clicked = st.button("Search Recommendations", use_container_width=True)
+
+    # 5. Despliegue de Resultados (Sin porcentajes de Match)
+    if search_clicked:
+
+        if st.session_state.user_input:
+            query = st.session_state.user_input.strip()
+
+            if len(query.split()) >= 3 and not is_english_query(query):
+                st.warning("Please enter your game description in English.")
+                return
+
+            st.write("---")
+
+            response = get_recommendations(query)
+
+            if response.get("error"):
+                st.error(response["error"])
+                # Nota: Asegúrate de que este 'return' esté dentro de una función o cámbialo por un bloque condicional
+            else:
+                assistant_response = response.get("respuesta") or response.get("message")
+                if assistant_response:
+                    with st.chat_message("assistant"):
+                        st.markdown(assistant_response)
+
+            if response.get("consulta_mejorada"):
+                st.info(f"🔍 Búsqueda mejorada: {response['consulta_mejorada']}")
+
+            st.subheader(f"🎮 Recommendations based on: '{st.session_state.user_input}'")
+
+            games = response.get("recommendations", [])
+
+            def parse_price(price):
+                cleaned = re.sub(r'[^\d.]', '', str(price))
+                parts = cleaned.split('.')
+
+                if len(parts) > 2:
+                    cleaned = parts[0] + '.' + ''.join(parts[1:])
+
+                return float(cleaned or 0)
+
+            # Filtrado por precio
+            green_dollar = '<span style="color: #2ecc71; font-weight: bold; margin-right: 5px;">&#36;</span>'
+            games = [
+                game for game in games
+                if parse_price(game.get("original_price", 0)) <= precio
+            ]
+
+            st.write(f"Games after price filter: {len(games)}")
+
+            if not games:
+                st.warning("No recommendations found with the selected price filter.")
+            else:
+                # Iteración para mostrar cada juego en una fila vertical
+                for game in games[:5]:
+                    # Creamos una fila dividida en 2 columnas (proporción 2:3)
+                    col_izq, col_der = st.columns([2, 3])
+
+                    with col_izq:
+                        # Obtenemos la imagen (usamos una por defecto si no existe)
+                        #img_url = game.get('image_url') or game.get('header_image') or "https://via.placeholder.com/460x215?text=No+Image+Available"
+                        img_url = game.get('image_url') or game.get('header_image')
+                        if not img_url and game.get('app_id'):
+                            img_url = f"https://cdn.akamai.steamstatic.com/steam/apps/{game['app_id']}/header.jpg"
+                        if not img_url:
+                            img_url = "https://via.placeholder.com/460x215?text=Preview+Not+Available"
+
+                        if game.get('trailer'):
+                            # Efecto "Slide": Pestañas para alternar entre Imagen y Video
+                            tab_img, tab_video = st.tabs(["🖼️ Poster", "🎬 Trailer"])
+
+                            with tab_img:
+                                st.image(img_url, use_container_width=True)
+
+                            with tab_video:
+                                st.markdown(f'''
+                                    <video width="100%" controls style="border-radius: 10px;">
+                                        <source src="{game['trailer']}">
+                                    </video>
+                                ''', unsafe_allow_html=True)
+                        else:
+                            st.image(img_url, use_container_width=True)
+
+                    with col_der:
+                        # Columna Derecha: Información detallada
+                        st.markdown(f"### **{game['name']}**")
+                        st.caption(f"📊 Match: {game['match']:.2%}")
+
+                        if game.get('descripcion'):
+                            st.write(game['descripcion'])
+
+                        st.write(f"**Genre:** {game['genre']}")
+                        st.write(f"**Tags:** {game['popular_tags']}")
+
+                        # Lógica de Precios/Descuentos
+                        if game.get('original_price') is None:
+                            st.markdown(f"{green_dollar} <span style='font-weight: bold;'>Free to play</span>", unsafe_allow_html=True)
+                        elif game.get('discount') and game['discount'] > 0:
+                            precio_html = f"""
+                            {green_dollar} <span style='text-decoration: line-through; color: #8b949e;'>{game['original_price']}</span>
+                            🏷️ <span style='color: #ff4b4b; font-weight: bold;'>-{game['discount']}% off</span>
                             """
-                            <div style="
-                                font-size:20px;
-                                color:#2ecc71;
-                                font-weight:800;
-                                margin-bottom:8px;
-                            ">
-                                Free to play
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                            st.markdown(precio_html, unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"{green_dollar} {game['original_price']}", unsafe_allow_html=True)
 
-                    # DISCOUNT
-                    elif (
-                        game.get("discount")
-                        and game["discount"] > 0
-                    ):
+                        st.write(f"⭐ {game['review_percentage']}")
+                        st.markdown(f"🔗 [Ver en Steam]({game['url']})")
 
-                        # ---------------- ORIGINAL PRICE ----------------
-                        raw_price = game.get("original_price")
+                    st.write("---") # Separador entre juegos
 
-                        cleaned = re.sub(
-                            r"[^\d.]",
-                            "",
-                            str(raw_price)
-                        )
-
-                        original_value = float(cleaned or 0)
-
-                        # MXN -> USD aprox
-                        original_usd = original_value / 20
-
-                        # ---------------- DISCOUNT ----------------
-                        discount = float(game.get("discount", 0))
-
-                        final_price = (
-                            original_usd
-                            * (1 - discount / 100)
-                        )
-
-                        original_price = f"USD ${original_usd:.2f}"
-
-                        discounted_price = f"USD ${final_price:.2f}"
-
-                        # ---------------- UI ----------------
-                        price_col1, price_col2, price_col3 = st.columns([2, 1, 2])
-
-                        with price_col1:
-
-                            st.markdown(
-                                f"""
-                                <div style="
-                                    text-decoration:line-through;
-                                    color:#8b949e;
-                                    font-size:16px;
-                                    font-weight:600;
-                                    margin-top:6px;
-                                ">
-                                    {original_price}
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                        with price_col2:
-
-                            st.markdown(
-                                f"""
-                                <div style="
-                                    color:#ff4b4b;
-                                    font-size:15px;
-                                    font-weight:800;
-                                    margin-top:7px;
-                                    text-align:center;
-                                ">
-                                    -{int(discount)}%
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                        with price_col3:
-
-                            st.markdown(
-                                f"""
-                                <div style="
-                                    color:#2ecc71;
-                                    font-size:20px;
-                                    font-weight:800;
-                                    text-align:left;
-                                ">
-                                    {discounted_price}
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                    # NORMAL PRICE
-                    else:
-
-                        normal_price = normalize_price(
-                            game.get("original_price")
-                        )
-
-                        st.markdown(
-                            f"""
-                            <div style="
-                                font-size:22px;
-                                color:#2ecc71;
-                                font-weight:800;
-                                margin-bottom:8px;
-                            ">
-                                {normal_price}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                    # ---------------------------------------------------
-                    # REVIEWS
-                    # ---------------------------------------------------
-                    st.markdown(
-                        f"""
-                        <div style="
-                            font-size:13px;
-                            color:#facc15;
-                            line-height:1;
-                        ">
-                            ⭐ {game.get('review_percentage', 'No reviews')}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
     else:
+        st.error("Please describe your ideal game first!")
 
-        st.info(
-            "Describe your ideal game "
-            "and click Search Recommendations"
-        )
-
-    # ---------------------------------------------------
-    # FOOTER
-    # ---------------------------------------------------
-    st.markdown(
-        """
-        <br><br>
-
-        <p style="
-            text-align:center;
-            color:#484f58;
-        ">
-            NLP Semantic Recommender |
-            Le Wagon Final Project
-        </p>
-        """,
-        unsafe_allow_html=True
-    )
-
+    # 6. Pie de página
+    st.markdown("<br><br><p style='text-align: center; color: #484f58;'>NLP Semantic Recommender | Le Wagon Final Project</p>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
