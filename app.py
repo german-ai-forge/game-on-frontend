@@ -1,5 +1,6 @@
 import streamlit as st
 from services.query_api import get_recommendations
+from utils.language_utils import is_english_query
 import re
 
 
@@ -294,18 +295,30 @@ def main():
         )
 
         st.write("")
+        # --- EL TRUCO INFALIBLE: SUB-COLUMNAS ---
+#        Creamos 3 columnas pequeñas dentro de col2. La del medio es más ancha.
+        sub_col1, sub_col2, sub_col3 = st.columns([1, 2, 1])
 
-        sub1, sub2, sub3 = st.columns([1, 2, 1])
+        with sub_col2:
 
-        with sub2:
-
-            if st.button(
+            search_clicked = st.button(
                 "Search Recommendations",
                 use_container_width=True
-            ):
+                )
+        if search_clicked:
 
-                st.session_state.search_done = True
-                st.session_state.results = None
+            query = st.session_state.user_input.strip()
+
+    # Language validation
+            if len(query.split()) >= 2 and not is_english_query(query):
+                st.warning(
+                 "Please enter your game description in English."
+                 )
+                return
+
+            st.session_state.search_done = True
+            st.session_state.results = get_recommendations(query)
+# 5. Despliegue de Resultados
 
     # ---------------------------------------------------
     # RESULTS
