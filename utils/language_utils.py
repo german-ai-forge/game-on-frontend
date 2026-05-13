@@ -1,8 +1,8 @@
-from langdetect import detect, LangDetectException
+from langdetect import detect
 
 
-def is_english_query(text: str) -> bool:
+def is_english_query(text):
     try:
         return detect(text) == "en"
-    except LangDetectException:
-        return False
+    except Exception:
+        return True
