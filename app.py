@@ -49,6 +49,14 @@ def main():
     # ---------------------------------------------------
     st.markdown("""
     <style>
+    /* Ocultar progress bar de Streamlit */
+    .stProgress {
+        display: none !important;
+    }
+
+    div[data-testid="stStatusWidget"] {
+        display: none !important;
+    }
 
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
 
@@ -657,36 +665,15 @@ def main():
                             return None
 
                         try:
-
-                            # extrae únicamente números
-                            cleaned = re.sub(
-                                r"[^\d.]",
-                                "",
-                                str(price)
-                            )
-
+                            # Extraer solo números
+                            cleaned = re.sub(r"[^\d.]", "", str(price))
                             parts = cleaned.split(".")
-
                             if len(parts) > 2:
-                                cleaned = (
-                                    parts[0]
-                                    + "."
-                                    + "".join(parts[1:])
-                                )
-
+                                cleaned = parts[0] + "." + "".join(parts[1:])
                             value = float(cleaned or 0)
-
-                            # ---------------------------------------------------
-                            # APROX USD NORMALIZATION
-                            # ---------------------------------------------------
-                            # Steam suele devolver MXN para LATAM
-                            # Conversión aproximada MXN -> USD
-                            # Ajusta si deseas otro rate
-                            # ---------------------------------------------------
-
-                            usd_value = value / 20
-
-                            return f"USD ${usd_value:.2f}"
+                            # Steam devuelve centavos, dividir entre 100
+                            value = value / 100
+                            return f"S/. {value:.2f}"
 
                         except:
                             return str(price)
