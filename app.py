@@ -346,7 +346,7 @@ def main():
             label="",
             min_value=0,
             max_value=300,
-            value=25,
+            value=100,
             format="S/.%d"
         )
 
@@ -416,14 +416,12 @@ def main():
             if not price_str:
                 return 0
 
-            cleaned = re.sub(r"[^\d.,]", "", str(price_str))
-            cleaned = cleaned.replace(',', '.')
-            parts = cleaned.split(".")
+            # Extraer solo el número con re, ignorando prefijos como S/.
+            match = re.search(r'(\d+(?:\.\d+)?)', str(price_str).replace(',', '.'))
+            if match:
+                return float(match.group(1))
 
-            if len(parts) > 2:
-                cleaned = parts[0] + "." + "".join(parts[1:])
-
-            return float(cleaned or 0)
+            return 0
 
         # ---------------------------------------------------
         # COMPARABLE PRICE (para el filtro)
@@ -439,16 +437,13 @@ def main():
             )
             discount = g.get("discount", 0)
 
-            if discount and discount > 0:
-                valor_match = re.search(r'(\d+(?:[.,]\d+)?)', price_str)
-                if valor_match:
-                    try:
-                        valor_final = float(valor_match.group(1).replace(',', '.'))
-                        return valor_final / (1 - discount / 100)
-                    except (ValueError, ZeroDivisionError):
-                        pass
+            precio_original = parse_price(price_str)
 
-            return parse_price(price_str)
+            # Si hay descuento, comparar por el precio final que realmente pagas
+            if discount and discount > 0:
+                return precio_original * (1 - discount / 100)
+
+            return precio_original
 
         # ---------------------------------------------------
         # FILTER
@@ -765,19 +760,20 @@ def main():
                         )
 
                     elif discount and discount > 0:
-                        # Calcular precio original desde precio final y descuento
+                        # original_price ES el precio original (sin descuento)
+                        # El precio final se calcula: original * (1 - descuento/100)
                         valor_match = re.search(r'(\d+(?:[.,]\d+)?)', price_str)
-                        precio_original_calculado = ""
+                        precio_final_calculado = ""
 
                         if valor_match:
                             try:
-                                valor_final = float(valor_match.group(1).replace(',', '.'))
-                                valor_original = valor_final / (1 - discount / 100)
+                                valor_original = float(valor_match.group(1).replace(',', '.'))
+                                valor_final = valor_original * (1 - discount / 100)
                                 prefijo_match = re.search(r'^([^\d]+)', price_str.strip())
                                 prefijo = prefijo_match.group(1) if prefijo_match else ""
-                                precio_original_calculado = f"{prefijo}{valor_original:.2f}"
+                                precio_final_calculado = f"{prefijo}{valor_final:.2f}"
                             except (ValueError, ZeroDivisionError):
-                                precio_original_calculado = ""
+                                precio_final_calculado = ""
 
                         st.markdown(
                             f"""
@@ -797,7 +793,7 @@ def main():
                                     color:#6e7681;
                                     font-size:18px;
                                     font-weight:500;
-                                ">{precio_original_calculado}</span>
+                                ">{price_str}</span>
                                 <span style="
                                     background:linear-gradient(135deg, #c0392b, #e74c3c);
                                     color:white;
@@ -814,7 +810,7 @@ def main():
                                     font-weight:900;
                                     letter-spacing:0.5px;
                                     text-shadow:0 0 20px rgba(46,204,113,0.3);
-                                ">{price_str}</span>
+                                ">{precio_final_calculado}</span>
                             </div>
                             """,
                             unsafe_allow_html=True
