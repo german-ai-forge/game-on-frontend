@@ -1,6 +1,6 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from services.query_api import get_recommendations
-from utils.language_utils import is_english_query
 import re
 
 
@@ -363,12 +363,6 @@ def main():
 
             query = st.session_state.user_input.strip()
 
-            if len(query.split()) >= 2 and not is_english_query(query):
-                st.warning(
-                 "Please enter your game description in English."
-                 )
-                return
-
             st.session_state.search_done = True
             st.session_state.results = get_recommendations(query)
 
@@ -438,7 +432,11 @@ def main():
         # ---------------------------------------------------
         def get_comparable_price(g):
 
-            price_str = g.get("original_price", "") or ""
+            price_str = (
+                g.get("original_price", "")
+                or g.get("price", "")
+                or ""
+            )
             discount = g.get("discount", 0)
 
             if discount and discount > 0:
@@ -736,7 +734,11 @@ def main():
                     # Si hay descuento, calculamos el precio original real
                     # ---------------------------------------------------
                     discount = game.get("discount", 0)
-                    price_str = game.get("original_price", "") or ""
+                    price_str = (
+                        game.get("original_price", "")
+                        or game.get("price", "")
+                        or ""
+                    )
 
                     if not price_str:
                         # Free to play
