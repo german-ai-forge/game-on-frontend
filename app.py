@@ -220,6 +220,36 @@ def main():
         line-height: 1.15 !important;
     }
 
+    /* SLIDER ESTÉTICO */
+
+    div[data-testid="stSlider"] > div > div > div {
+        height: 5px !important;
+        background: #21262d !important;
+        border-radius: 10px !important;
+    }
+
+    div[data-testid="stSlider"] div[role="slider"] {
+        width: 22px !important;
+        height: 22px !important;
+        background: white !important;
+        border: 3px solid #4b6cb7 !important;
+        border-radius: 50% !important;
+        box-shadow: 0 0 12px rgba(75,108,183,0.6) !important;
+    }
+
+    div[data-testid="stSlider"] div[role="slider"]:hover {
+        box-shadow: 0 0 20px rgba(56,139,253,0.9) !important;
+        border-color: #388bfd !important;
+    }
+
+    /* GAME DIVIDER */
+
+    .game-divider {
+        border: none;
+        border-top: 1px solid #21262d;
+        margin: 32px 0 32px 0;
+    }
+
     /* LINK BUTTON */
 
     [data-testid="stLinkButton"] a {
@@ -295,16 +325,32 @@ def main():
 
         st.session_state.last_input = st.session_state.user_input
 
+        st.markdown(
+            """
+            <div style="
+                font-size:18px;
+                font-weight:700;
+                color:white;
+                margin-bottom:4px;
+                margin-top:8px;
+                font-family:'Orbitron', sans-serif;
+                letter-spacing:1px;
+            ">
+                💰 Precio Máximo
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
         precio = st.slider(
-            "Max Price ($)",
-            0,
-            100,
-            25
+            label="",
+            min_value=0,
+            max_value=300,
+            value=25,
+            format="S/.%d"
         )
 
         st.write("")
-        # --- EL TRUCO INFALIBLE: SUB-COLUMNAS ---
-#        Creamos 3 columnas pequeñas dentro de col2. La del medio es más ancha.
         sub_col1, sub_col2, sub_col3 = st.columns([1, 2, 1])
 
         with sub_col2:
@@ -317,7 +363,6 @@ def main():
 
             query = st.session_state.user_input.strip()
 
-    # Language validation
             if len(query.split()) >= 2 and not is_english_query(query):
                 st.warning(
                  "Please enter your game description in English."
@@ -326,7 +371,6 @@ def main():
 
             st.session_state.search_done = True
             st.session_state.results = get_recommendations(query)
-# 5. Despliegue de Resultados
 
     # ---------------------------------------------------
     # RESULTS
@@ -373,36 +417,47 @@ def main():
         # ---------------------------------------------------
         # PRICE PARSER
         # ---------------------------------------------------
-        def parse_price(price):
+        def parse_price(price_str):
 
-            if price is None:
+            if not price_str:
                 return 0
 
-            cleaned = re.sub(
-                r"[^\d.]",
-                "",
-                str(price)
-            )
-
+            cleaned = re.sub(r"[^\d.,]", "", str(price_str))
+            cleaned = cleaned.replace(',', '.')
             parts = cleaned.split(".")
 
             if len(parts) > 2:
-                cleaned = (
-                    parts[0]
-                    + "."
-                    + "".join(parts[1:])
-                )
+                cleaned = parts[0] + "." + "".join(parts[1:])
 
             return float(cleaned or 0)
+
+        # ---------------------------------------------------
+        # COMPARABLE PRICE (para el filtro)
+        # El backend manda el precio FINAL en original_price
+        # Si hay descuento, calculamos el precio original real
+        # ---------------------------------------------------
+        def get_comparable_price(g):
+
+            price_str = g.get("original_price", "") or ""
+            discount = g.get("discount", 0)
+
+            if discount and discount > 0:
+                valor_match = re.search(r'(\d+(?:[.,]\d+)?)', price_str)
+                if valor_match:
+                    try:
+                        valor_final = float(valor_match.group(1).replace(',', '.'))
+                        return valor_final / (1 - discount / 100)
+                    except (ValueError, ZeroDivisionError):
+                        pass
+
+            return parse_price(price_str)
 
         # ---------------------------------------------------
         # FILTER
         # ---------------------------------------------------
         games = [
             g for g in games
-            if parse_price(
-                g.get("original_price", 0)
-            ) <= precio
+            if get_comparable_price(g) <= precio
         ]
 
         if not games:
@@ -422,10 +477,12 @@ def main():
 
                 best_match = i == 0
 
-                st.markdown(
-                    '<div class="game-card">',
-                    unsafe_allow_html=True
-                )
+                # Separador entre juegos (no antes del primero)
+                if i > 0:
+                    st.markdown(
+                        "<hr class='game-divider'>",
+                        unsafe_allow_html=True
+                    )
 
                 col_left, col_right = st.columns([2, 3])
 
@@ -521,8 +578,6 @@ def main():
                             use_container_width=True
                         )
 
-
-
                 # ---------------------------------------------------
                 # RIGHT
                 # ---------------------------------------------------
@@ -575,16 +630,32 @@ def main():
                     # ---------------------------------------------------
                     # MATCH
                     # ---------------------------------------------------
+                    match_pct = (game['match'] * 100)
+                    match_color = (
+                        "#2ecc71" if match_pct >= 70
+                        else "#facc15" if match_pct >= 50
+                        else "#8b949e"
+                    )
                     st.markdown(
                         f"""
                         <div style="
-                            color:#58a6ff;
-                            font-size:14px;
-                            font-weight:700;
-                            margin-top:2px;
-                            margin-bottom:8px;
+                            display:inline-flex;
+                            align-items:center;
+                            gap:6px;
+                            background:rgba(88,166,255,0.08);
+                            border:1px solid rgba(88,166,255,0.2);
+                            border-radius:20px;
+                            padding:4px 12px;
+                            margin-top:4px;
+                            margin-bottom:10px;
                         ">
-                            🎯 {(game['match'] * 100):.1f}% MATCH
+                            <span style="font-size:13px;">🎯</span>
+                            <span style="
+                                color:{match_color};
+                                font-size:13px;
+                                font-weight:800;
+                                letter-spacing:0.5px;
+                            ">{match_pct:.1f}% MATCH</span>
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -598,10 +669,14 @@ def main():
                         st.markdown(
                             f"""
                             <div style="
-                                font-size:14px;
-                                color:#d1d5db;
-                                line-height:1.2;
-                                margin-bottom:8px;
+                                font-size:13.5px;
+                                color:#c9d1d9;
+                                line-height:1.55;
+                                margin-bottom:12px;
+                                padding:10px 14px;
+                                background:rgba(255,255,255,0.03);
+                                border-left:3px solid #4b6cb7;
+                                border-radius:0 8px 8px 0;
                             ">
                                 {game['descripcion']}
                             </div>
@@ -657,147 +732,110 @@ def main():
 
                     # ---------------------------------------------------
                     # PRICE
+                    # NOTA: el backend manda el precio FINAL en original_price
+                    # Si hay descuento, calculamos el precio original real
                     # ---------------------------------------------------
+                    discount = game.get("discount", 0)
+                    price_str = game.get("original_price", "") or ""
 
-                    def normalize_price(price):
-
-                        if price is None:
-                            return None
-
-                        try:
-                            # Extraer solo números
-                            cleaned = re.sub(r"[^\d.]", "", str(price))
-                            parts = cleaned.split(".")
-                            if len(parts) > 2:
-                                cleaned = parts[0] + "." + "".join(parts[1:])
-                            value = float(cleaned or 0)
-                            # Steam devuelve centavos, dividir entre 100
-                            value = value / 100
-                            return f"S/. {value:.2f}"
-
-                        except:
-                            return str(price)
-
-
-                    # FREE
-                    if game.get("original_price") is None:
-
+                    if not price_str:
+                        # Free to play
                         st.markdown(
                             """
                             <div style="
-                                font-size:20px;
+                                display:inline-flex;
+                                align-items:center;
+                                gap:8px;
+                                background:rgba(46,204,113,0.1);
+                                border:1px solid rgba(46,204,113,0.35);
+                                border-radius:10px;
+                                padding:10px 18px;
+                                margin-top:10px;
+                                font-size:22px;
                                 color:#2ecc71;
                                 font-weight:800;
-                                margin-bottom:8px;
+                                letter-spacing:0.5px;
                             ">
-                                Free to play
+                                🎁 Free to Play
                             </div>
                             """,
                             unsafe_allow_html=True
                         )
 
-                    # DISCOUNT
-                    elif (
-                        game.get("discount")
-                        and game["discount"] > 0
-                    ):
+                    elif discount and discount > 0:
+                        # Calcular precio original desde precio final y descuento
+                        valor_match = re.search(r'(\d+(?:[.,]\d+)?)', price_str)
+                        precio_original_calculado = ""
 
-                        # ---------------- ORIGINAL PRICE ----------------
-                        raw_price = game.get("original_price")
-
-                        cleaned = re.sub(
-                            r"[^\d.]",
-                            "",
-                            str(raw_price)
-                        )
-
-                        original_value = float(cleaned or 0)
-
-                        # MXN -> USD aprox
-                        original_usd = original_value / 20
-
-                        # ---------------- DISCOUNT ----------------
-                        discount = float(game.get("discount", 0))
-
-                        final_price = (
-                            original_usd
-                            * (1 - discount / 100)
-                        )
-
-                        original_price = f"USD ${original_usd:.2f}"
-
-                        discounted_price = f"USD ${final_price:.2f}"
-
-                        # ---------------- UI ----------------
-                        price_col1, price_col2, price_col3 = st.columns([2, 1, 2])
-
-                        with price_col1:
-
-                            st.markdown(
-                                f"""
-                                <div style="
-                                    text-decoration:line-through;
-                                    color:#8b949e;
-                                    font-size:16px;
-                                    font-weight:600;
-                                    margin-top:6px;
-                                ">
-                                    {original_price}
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                        with price_col2:
-
-                            st.markdown(
-                                f"""
-                                <div style="
-                                    color:#ff4b4b;
-                                    font-size:15px;
-                                    font-weight:800;
-                                    margin-top:7px;
-                                    text-align:center;
-                                ">
-                                    -{int(discount)}%
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                        with price_col3:
-
-                            st.markdown(
-                                f"""
-                                <div style="
-                                    color:#2ecc71;
-                                    font-size:20px;
-                                    font-weight:800;
-                                    text-align:left;
-                                ">
-                                    {discounted_price}
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
-
-                    # NORMAL PRICE
-                    else:
-
-                        normal_price = normalize_price(
-                            game.get("original_price")
-                        )
+                        if valor_match:
+                            try:
+                                valor_final = float(valor_match.group(1).replace(',', '.'))
+                                valor_original = valor_final / (1 - discount / 100)
+                                prefijo_match = re.search(r'^([^\d]+)', price_str.strip())
+                                prefijo = prefijo_match.group(1) if prefijo_match else ""
+                                precio_original_calculado = f"{prefijo}{valor_original:.2f}"
+                            except (ValueError, ZeroDivisionError):
+                                precio_original_calculado = ""
 
                         st.markdown(
                             f"""
                             <div style="
-                                font-size:22px;
-                                color:#2ecc71;
-                                font-weight:800;
-                                margin-bottom:8px;
+                                display:flex;
+                                align-items:center;
+                                gap:12px;
+                                flex-wrap:wrap;
+                                margin-top:10px;
+                                padding:12px 16px;
+                                background:rgba(46,204,113,0.06);
+                                border:1px solid rgba(46,204,113,0.15);
+                                border-radius:12px;
                             ">
-                                {normal_price}
+                                <span style="
+                                    text-decoration:line-through;
+                                    color:#6e7681;
+                                    font-size:18px;
+                                    font-weight:500;
+                                ">{precio_original_calculado}</span>
+                                <span style="
+                                    background:linear-gradient(135deg, #c0392b, #e74c3c);
+                                    color:white;
+                                    font-size:15px;
+                                    font-weight:900;
+                                    padding:5px 12px;
+                                    border-radius:8px;
+                                    letter-spacing:1px;
+                                    box-shadow:0 2px 8px rgba(192,57,43,0.4);
+                                ">-{int(discount)}%</span>
+                                <span style="
+                                    color:#2ecc71;
+                                    font-size:30px;
+                                    font-weight:900;
+                                    letter-spacing:0.5px;
+                                    text-shadow:0 0 20px rgba(46,204,113,0.3);
+                                ">{price_str}</span>
                             </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                    else:
+                        # Precio normal sin descuento
+                        st.markdown(
+                            f"""
+                            <div style="
+                                display:inline-flex;
+                                align-items:center;
+                                padding:10px 18px;
+                                margin-top:10px;
+                                background:rgba(46,204,113,0.06);
+                                border:1px solid rgba(46,204,113,0.2);
+                                border-radius:12px;
+                                color:#2ecc71;
+                                font-size:28px;
+                                font-weight:900;
+                                letter-spacing:0.5px;
+                                text-shadow:0 0 20px rgba(46,204,113,0.3);
+                            ">{price_str}</div>
                             """,
                             unsafe_allow_html=True
                         )
@@ -808,9 +846,17 @@ def main():
                     st.markdown(
                         f"""
                         <div style="
-                            font-size:13px;
+                            display:inline-flex;
+                            align-items:center;
+                            gap:5px;
+                            margin-top:8px;
+                            background:rgba(250,204,21,0.07);
+                            border:1px solid rgba(250,204,21,0.2);
+                            border-radius:20px;
+                            padding:4px 12px;
+                            font-size:12.5px;
                             color:#facc15;
-                            line-height:1;
+                            font-weight:600;
                         ">
                             ⭐ {game.get('review_percentage', 'No reviews')}
                         </div>
